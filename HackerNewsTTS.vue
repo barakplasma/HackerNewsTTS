@@ -1,49 +1,74 @@
 <template>
   <div id="app">
     <h1>{{ message }}</h1>
-    <dl>
-      <dt v-for="post in stories">
-        <a :href="post.href" target="_blank">{{ post.title }}</a>
-      </dt>
-    </dl>
-    <select v-model="index">
-      <option v-for="(voice, index) in voices" :key="index" :value="index">
+    <label for="select">Available Voices</label>
+    <select v-model="selectedVoice">
+      <option
+        v-for="voice in [...voices]"
+        :key="voice.name"
+        :value="voice.name"
+      >
         {{ voice.name }}
       </option>
     </select>
-    <button @click="readPage">Read top headlines</button>
-    <button @click="stopReading">⏹</button>
+    <button v-if="status !== 'playing'" @click="readPage">Read top headlines</button>
+    <button v-if="status === 'playing'" @click="stopReading">⏹</button>
+    <button v-if="status === 'paused'" @click="resumeReading">Resume 🔊</button>
+    <article>
+      <dl>
+        <dt v-for="post in stories">
+          <a :href="post.href" target="_blank">{{ post.title }}</a>
+        </dt>
+      </dl>
+    </article>
   </div>
 </template>
 
 <script>
 export default {
   data() {
-    this.voices = window.speechSynthesis.getVoices();
-    let daniel = this.voices.findIndex((v) => v.name === "Daniel");
-
     return {
       message: "HackerNews TTS",
-      stories: this.stories,
-      voices: this.voices,
-      voice: this.voices[this.index],
-      index: daniel > -1 ? daniel : 0
+      stories: [],
+      status: "stopped",
+      voices: new Set(),
+      selectedVoice: "no voices available",
+      utterance: null,
     };
   },
   methods: {
+    getVoices() {
+      let availableVoices = speechSynthesis.getVoices();
+      if (availableVoices.length > 0) {
+        for (let v of availableVoices) {
+          this.voices.add(v);
+        }
+      } else {
+        setTimeout(this.getVoices, 500)
+      }
+    },
     stopReading() {
-      window.speechSynthesis.pause();
+      speechSynthesis.pause();
+      this.status = "paused"
+    },
+    resumeReading() {
+      speechSynthesis.resume();
+      this.status = "playing"
     },
     readPage() {
-      let utterance = new SpeechSynthesisUtterance(
+      const utterance = new SpeechSynthesisUtterance(
         `...Top Hacker News Stories, narrated by Hacker News Text to speech; using the '${
-          this.voices[this.index].name
+          this.selectedVoice
         } voice: ...${this.stories
           .map((story) => story.title)
           .join(". Next story: ")}. End of stories`
       );
-      utterance.voice = this.voices[this.index];
+
+      this.status = "playing"
       speechSynthesis.speak(utterance);
+      utterance.onend = () => {this.status === 'stopped'; console.info('stopped')}
+      utterance.onerror = console.error
+      this.utterance = utterance;
     },
     async fetchTitle(id) {
       return await fetch(
@@ -70,6 +95,8 @@ export default {
       this.stories = await Promise.all(
         stories.slice(0, 9).map((story) => this.fetchTitle(story))
       );
+      
+      this.getVoices();
     }
   },
   mounted() {
@@ -90,6 +117,7 @@ export default {
 a,
 button {
   color: #4fc08d;
+  pointer-style: cursor;
 }
 
 button {
