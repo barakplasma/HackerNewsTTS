@@ -25,6 +25,21 @@
 </template>
 
 <script>
+import { useSpeechSynthesis } from '@vueuse/core'
+
+const {
+  isSupported,
+  isPlaying,
+  status,
+  voiceInfo,
+  utterance,
+  error,
+  stop,
+
+  toggle,
+  speak,
+} = useSpeechSynthesis()
+
 export default {
   data() {
     return {
